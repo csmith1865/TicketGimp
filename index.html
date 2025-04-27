@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TicketGimp</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: monospace;
+      background-color: #080c18;
+      color: white;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-top: 50px;
+    }
+    .logo {
+      position: absolute;
+      width: 40px;
+      height: 40px;
+      left: 25px;
+      top: 60px;
+    }
+    .title {
+      font-size: 40px;
+      margin-top: 100px;
+    }
+    .ticket-input {
+      padding: 5px;
+      border-radius: 5px;
+      background-color: #222;
+      border-bottom: 1px solid #ddd;
+      width: 80%;
+      color: white;
+      margin: 50px;
+    }
+    .ticket-input:focus {
+      outline: none;
+      border-bottom: 2px solid #d500f9;
+    }
+    .barcode {
+      background-color: white;
+      padding: 5px;
+    }
+    .barcode img {
+      width: 350px;
+      height: 120px;
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/otpauth@9.0.2/dist/otpauth.umd.min.js"></script>
+  <script src="https://unpkg.com/bwip-js/dist/bwip-js-min.js"></script>
+</head>
+<body>
+  <img src="assets/flash-circuit-512.png" alt="Logo" class="logo" />
+  <div class="title">TicketGimp</div>
+  <input id="ticketInput" class="ticket-input" placeholder="insert ticket here" />
+  <div class="barcode" id="barcode"></div>
+
+  <script>
+    const TOTP_STEP = 15;
+
+    function generateSignedToken(ticket, now) {
+      const parsedTicket = JSON.parse(atob(ticket));
+      const bearerKey = parsedTicket.t;
+      const customerKey = OTPAuth.Secret.fromHex(parsedTicket.ck);
+      const eventKey = OTPAuth.Secret.fromHex(parsedTicket.ek);
+
+      const eventOTP = new OTPAuth.TOTP({ secret: eventKey, period: TOTP_STEP }).generate({ timestamp: now });
+      const customerOTP = new OTPAuth.TOTP({ secret: customerKey, period: TOTP_STEP }).generate({ timestamp: now });
+      const secs = Math.floor(now / 1000);
+
+      return [bearerKey, eventOTP, customerOTP, secs].join("::");
+    }
+
+    const ticketInput = document.getElementById('ticketInput');
+    const barcodeDiv = document.getElementById('barcode');
+
+    function updateBarcode() {
+      const ticket = ticketInput.value;
+      if (!ticket) {
+        barcodeDiv.innerHTML = '';
+        return;
+      }
+      try {
+        const now = Date.now();
+        const token = generateSignedToken(ticket, now);
+        const canvas = document.createElement('canvas');
+        try {
+          bwipjs.toCanvas(canvas, {
+            bcid: 'pdf417',
+            text: token,
+          });
+          barcodeDiv.innerHTML = '';
+          barcodeDiv.appendChild(canvas);
+        } catch (e) {
+          console.error('Barcode generation error:', e);
+        }
+      } catch (e) {
+        console.error('Token generation error:', e);
+      }
+    }
+
+    ticketInput.addEventListener('input', updateBarcode);
+    setInterval(updateBarcode, 500);
+  </script>
+</body>
+</html>
